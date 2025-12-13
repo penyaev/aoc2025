@@ -1,14 +1,5 @@
 use std::collections::HashSet;
-use aoc_2025::{input_file, read_split};
-
-fn num_len(x: u64) -> u8 {
-    let mut l: u8 = 1;
-    while x >= 10u64.pow(l as u32) {
-        l += 1;
-    }
-
-    l
-}
+use aoc_2025::{input_file, num_len, read_split};
 
 
 fn invalid_ids(from: u64, to: u64) -> Vec<u64> {
