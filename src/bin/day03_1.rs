@@ -1,4 +1,4 @@
-use aoc_2025::{input_file, read_lines};
+use aoc_2025::utils::{input_file, read_lines};
 
 fn main() {
     let input = read_lines(input_file(3, false)).expect("failed to read input");

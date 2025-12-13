@@ -1,6 +1,5 @@
 use std::collections::HashSet;
-use aoc_2025::{input_file, num_len, read_split};
-
+use aoc_2025::utils::{input_file, num_len, read_split};
 
 fn invalid_ids(from: u64, to: u64) -> Vec<u64> {
     let mut result: Vec<u64> = Vec::new();

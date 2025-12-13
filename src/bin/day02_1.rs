@@ -1,4 +1,4 @@
-use aoc_2025::{input_file, num_len, read_split};
+use aoc_2025::utils::{input_file, num_len, read_split};
 
 struct InvalidIDIterator {
     to: u64,

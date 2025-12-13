@@ -1,5 +1,4 @@
-use aoc_2025::{input_file, prepend_digit, read_lines};
-
+use aoc_2025::utils::{input_file, prepend_digit, read_lines};
 
 const MAX_LEN: usize = 12;
 fn solve(digits: Vec<u8>) -> u64 {

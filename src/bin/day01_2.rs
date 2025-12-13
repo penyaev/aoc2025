@@ -1,4 +1,4 @@
-use aoc_2025::{read_lines, input_file};
+use aoc_2025::utils::{input_file, read_lines};
 
 #[derive(Debug)]
 enum Direction {
