@@ -142,7 +142,7 @@ fn main() {
     // fft -> dac: 11740656
     // dac -> fft: 0
     // dac -> out: 3263
-    // result: 473930047491888
+    // result (three above multiplied): 473930047491888
 
     let original_len = solver.graph.len();
     solver.prune_unreachable(&"fft".into());
