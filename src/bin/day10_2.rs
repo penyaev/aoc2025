@@ -1,11 +1,11 @@
 use aoc_2025::utils::{input_file, read_lines};
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::ops::Add;
+use std::collections::HashMap;
+use std::fmt::Display;
 
 #[derive(Eq, PartialEq, Debug, Clone, Hash)]
 struct Value {
-    digits: Vec<u8>,
+    digits: Vec<usize>,
 }
 
 impl Value {
@@ -17,11 +17,59 @@ impl Value {
 
     fn add(&self, other: &Self) -> Self {
         Self {
-            digits: self.digits.iter().zip(other.digits.iter()).map(|(x, y)| x + y).collect()
+            digits: self
+                .digits
+                .iter()
+                .zip(other.digits.iter())
+                .map(|(x, y)| x + y)
+                .collect(),
         }
+    }
+
+    fn sub(&self, other: &Self) -> Self {
+        Self {
+            digits: self
+                .digits
+                .iter()
+                .zip(other.digits.iter())
+                .map(|(x, y)| x - y)
+                .collect(),
+        }
+    }
+
+    fn div(&self, by: usize) -> Self {
+        Self {
+            digits: self.digits.iter().map(|x| x / by).collect(),
+        }
+    }
+
+    fn xor(&self, other: &Self) -> Self {
+        Self {
+            digits: self
+                .digits
+                .iter()
+                .zip(other.digits.iter())
+                .map(|(x, y)| x ^ y)
+                .collect(),
+        }
+    }
+
+    fn parity_mask(&self) -> Self {
+        Self {
+            digits: self.digits.iter().map(|x| x % 2).collect(),
+        }
+    }
+
+    fn zero(&self) -> bool {
+        self.digits.iter().all(|x| *x == 0)
     }
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.digits.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(""))
+    }
+}
 
 impl PartialOrd<Self> for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -39,114 +87,112 @@ impl PartialOrd<Self> for Value {
         Some(Ordering::Less)
     }
 }
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct Item {
-    value: Value,
-    ops: usize,
-    min_dist_to_target: usize,
+
+struct CombinationsIter<T> {
+    vec: Vec<T>,
+    pos: usize,
 }
-impl PartialOrd<Self> for Item {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+
+impl<T> CombinationsIter<T> {
+    fn new(vec: Vec<T>) -> Self {
+        Self { vec, pos: 0 }
     }
 }
 
-impl Ord for Item {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (self.ops + self.min_dist_to_target).cmp(&(other.ops + other.min_dist_to_target)).reverse()
+impl<T: Clone> Iterator for CombinationsIter<T> {
+    type Item = Vec<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let max = 1 << self.vec.len();
+        self.pos += 1;
+        if self.pos > max {
+            return None;
+        }
+
+        Some(
+            self.vec
+                .iter()
+                .enumerate()
+                .filter_map(|(i, x)| {
+                    if self.pos & (1 << i) != 0 {
+                        Some(x.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        )
     }
 }
 
 struct Solver {
-    queue: BinaryHeap<Item>,
     nums: Vec<Value>,
     target: Value,
-    seen: HashSet<Value>,
-    memo: HashMap<usize, Vec<Value>>,
+    cache: HashMap<Value, Option<usize>>,
 }
 
 impl Solver {
     fn new(nums: Vec<Value>, target: Value) -> Self {
-        Self {
-            queue: BinaryHeap::new(),
-            nums,
-            target,
-            seen: HashSet::new(),
-            memo: HashMap::new(),
-        }
+        Self { nums, target, cache: HashMap::new() }
     }
 
-    fn nums_with_digit(&mut self, pos: usize) -> &Vec<Value> {
-        if !self.memo.contains_key(&pos) {
-            let res = self
-                .nums
+    fn solve_for(&mut self, target: &Value) -> Option<usize> {
+        if target.zero() {
+            return Some(0);
+        }
+        if self.cache.contains_key(target) {
+            return self.cache.get(target).unwrap().clone();
+        }
+
+        let iter = CombinationsIter::new(self.nums.clone());
+        let parity_mask = target.parity_mask();
+
+        let mut best: Option<usize> = None;
+        for nums in iter {
+            let matching_parity = nums
                 .iter()
-                .filter(|x| x.digits[pos] == 1)
-                .filter(|x| x.digits[0..pos].iter().all(|x| *x == 0))
-                .cloned()
-                .collect();
-            self.memo.insert(pos, res);
+                .fold(Value::new(target.digits.len()), |acc, x| acc.xor(x))
+                == parity_mask;
+            if !matching_parity {
+                continue;
+            }
+
+            let sum = nums
+                .iter()
+                .fold(Value::new(target.digits.len()), |acc, x| acc.add(x));
+
+            if sum > *target {
+                continue;
+            }
+            let new_target = target.sub(&sum).div(2);
+            let x = self.solve_for(&new_target);
+            if x.is_none() {
+                continue;
+            }
+            let x_candidate = x.unwrap() * 2 + nums.len();
+            if let Some(best_value) = best {
+                if x_candidate < best_value {
+                    best = Some(x_candidate);
+                }
+            } else {
+                best = Some(x_candidate);
+            }
         }
-        self.memo.get(&pos).unwrap()
-    }
 
-    fn digit_reached(&self, pos: usize, value: &Value) -> bool {
-        value.digits[pos] == self.target.digits[pos]
-    }
-
-    fn min_dist_to_target(&self, value: &Value) -> usize {
-        value
-            .digits
-            .iter()
-            .enumerate()
-            .map(|(i, x)| x.abs_diff(self.target.digits[i]) as usize)
-            .max()
-            .unwrap()
+        // println!("best for {} is {:?}", target, best);
+        self.cache.insert(target.clone(), best);
+        best
     }
 
     fn solve(&mut self) -> usize {
-        self.queue.clear();
-        let init_value = Value::new(self.target.digits.len());
-        let min_dist = self.min_dist_to_target(&init_value);
-        self.queue.push(Item {
-            ops: 0,
-            value: init_value,
-            min_dist_to_target: min_dist,
-        });
-
-        while !self.queue.is_empty() {
-            let item = self.queue.pop().unwrap();
-
-            if item.value > self.target {
-                continue;
-            }
-            if item.value == self.target {
-                return item.ops;
-            }
-            if self.seen.contains(&item.value) {
-                continue;
-            }
-            self.seen.insert(item.value.clone());
-
-            for num in &self.nums {
-                let new_value = item.value.add(num);
-                if new_value > self.target {
-                    continue;
-                }
-                self.queue.push(Item{
-                    min_dist_to_target: self.min_dist_to_target(&new_value),
-                    ops: item.ops + 1,
-                    value: new_value
-                });
-            }
-        }
-
-        panic!("failed to solve");
+        self.solve_for(&self.target.clone()).unwrap()
     }
 }
 
 fn main() {
-    let input = read_lines(input_file(10, true)).expect("failed to read input");
+    // solution idea courtesy of:
+    // https://www.reddit.com/r/adventofcode/comments/1pk87hl/2025_day_10_part_2_bifurcate_your_way_to_victory/
+    let input = read_lines(input_file(10, false)).expect("failed to read input");
 
     let mut result = 0;
     for line_result in input {
@@ -157,7 +203,7 @@ fn main() {
         assert!(parts.len() >= 3);
 
         let bit_len = parts[0][1..parts[0].len() - 1].chars().count();
-        let target: Vec<u8> = parts[parts.len() - 1]
+        let target: Vec<usize> = parts[parts.len() - 1]
             .trim_matches(['{', '}'])
             .split(',')
             .map(|x| x.parse().unwrap())
